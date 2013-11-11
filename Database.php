@@ -75,6 +75,16 @@ class Database
      */
     private $isWhereFunctionCalled = 0;
 
+    /**
+     * @NumberOfAffectedRows = stores the number of affected rows in delete and update statements.
+     */
+    private $numberOfAffectedRows = null;
+
+    /**
+     * @queryStatement = this variable will hold the last executed query.
+     */
+    private static $queryStatement = null;
+
     /*
      * @constructor set custom exception handler for the object.
      * create a singleton PDO object from the final class Database Factory
@@ -104,9 +114,6 @@ class Database
      */
     public function throw_exception(Exception $exception)
     {
-        echo "<pre>";
-        print_r($exception);
-        die();
         echo($exception->getMessage());
     }
 
@@ -186,6 +193,8 @@ class Database
     {
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->statement->execute();
+
+        $this->queryObject = new Query($this->statement);
         $this->wrap_up_query();
         return;
     }
@@ -198,6 +207,10 @@ class Database
         if(!empty($this->update))
         {
             $query = $this->update.' '.$this->join.' '.$this->where;
+        }
+        else if(!empty($this->delete))
+        {
+            $query = $this->delete.' '.$this->join.' '.$this->where;
         }
         else
         {
@@ -251,6 +264,21 @@ class Database
             $this->bind_values($this->prepareStatementArray);
         }
 
+    }
+
+    /**
+     * @set_query() initialises the static variable that displays the query.
+     */
+    private function set_query()
+    {
+        $this->queryStatement = $this->query;
+        foreach($this->prepareStatementArray as $key => $value)
+        {
+            if($value == NULL)
+                $value = 'NULL';
+            $this->queryStatement = preg_replace('^'.$key.'^', $value, $this->queryStatement);
+        }
+        echo $this->queryStatement;
     }
 
     /**
@@ -372,6 +400,8 @@ class Database
         if($this->isWhereFunctionCalled == 0)
         {
             throw new Exception("Please create the where clause by calling where() before calling update()");
+
+            $this->isWhereFunctionCalled = 0;
         }
 
         /*
@@ -429,10 +459,48 @@ class Database
     }
 
     /**
-     * @param $field
-     * @param null $value
-     * @return Database
-     * @throws Exception
+     * @param null $tableName
+     * @throws Exception = function where has to be called before delete can be called
+     */
+    public function delete($tableName = NULL)
+    {
+
+        if($this->isWhereFunctionCalled == 0)
+        {
+            throw new Exception("Please create the where clause by calling where() before calling update()");
+
+            $this->isWhereFunctionCalled = 0;
+        }
+
+        /*
+         * Check if table name is not empty
+         */
+
+        $this->check_table_name_is_present($tableName);
+
+        /**
+         * Table name and fields are present and hence we can now go
+         * ahead and create the Insert statement.
+         */
+        $query = "DELETE FROM `".$tableName."` ";
+
+        /**
+         * Pass the query and the prepared statement array to the query function.
+         */
+        $this->delete = $query;
+
+        $this->query = $this->query_builder();
+
+        $this->prepare_statement($this->query);
+
+        $this->execute_statement();
+    }
+
+    /**
+     * @param $field = field in the where condition
+     * @param null $value =  value of the field
+     * @return Database = returns the object of the class
+     * @throws Exception = throws exception if the value is an array or an object
      */
     public function where($field , $value = NULL)
     {
@@ -443,7 +511,7 @@ class Database
 
         if(is_array($value) or is_object($value))
         {
-            throw new Exception('Values cannot be an array or an objcet');
+            throw new Exception('Values cannot be an array or an object');
         }
 
         /**
@@ -508,6 +576,10 @@ class Database
         return $this;
     }
 
+    /**
+     * @param $fields
+     * @return Database
+     */
     public function group_by($fields)
     {
         /**
@@ -520,6 +592,11 @@ class Database
         return $this;
     }
 
+
+    /**
+     * @param $fields
+     * @return Database
+     */
     public function order_by($fields)
     {
         /**
@@ -532,6 +609,12 @@ class Database
         return $this;
     }
 
+    /**
+     * @param $fields
+     * @param bool $classifier = 'classifier' is used to backtick columns
+     *  false when using alias for column names
+     * @return Database
+     */
     public function select($fields, $classifier = true)
     {
         /**
@@ -570,6 +653,11 @@ class Database
         return $this;
     }
 
+    /**
+     * @param $tableNames
+     * @param bool $classifier
+     * @return Database
+     */
     public function from ($tableNames,$classifier = true)
     {
         /**
@@ -600,19 +688,36 @@ class Database
 
         return $this;
     }
-    
+
+    /**
+     * @returns the object of the type query.
+     */
     public function get()
     {
         $this->query = $this->query_builder();
+
         $this->prepare_statement($this->query);
+
         $this->execute_statement();
+
+        return $this->queryObject;
+    }
+
+    /**
+     * @return last executed query.
+     */
+    public function last_query()
+    {
+        return $this->queryStatement;
+    }
+
+    /**
+     * @return last inserted string.
+     */
+    public function insert_id()
+    {
+        return $this->db->lastInsertId();
     }
 }
 
-
-$db = new Database();
-
-//$a->insert('test', array('field1' => null, 'field2' => 1009 , 'field3' => 2009));
-$db->where('`field1` !=', 2)->update('test', array('field2' => 115, 'field3' => 116));
-
-//$db->select('*')->from('test')->where('field1', 4)->get();
+/*EOF Database */

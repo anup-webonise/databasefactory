@@ -8,6 +8,9 @@
  * DatabaseFactory has been defined as final so that it cannot be
  * extended by any other class.
  */
+
+require_once('database.configuration.inc');
+
 class DatabaseFactory
 {
     /**
@@ -48,7 +51,7 @@ class DatabaseFactory
             set_exception_handler(array(__CLASS__, 'exception_handler'));
 
             //create PDO object.
-            self::$dbFactory = new PDO('mysql:host=localhost;dbname=test;charset=utf8', 'root', 'webonise6186') or die( 'Could Not Connect');
+            self::$dbFactory = new PDO($database['databaseType'].':host='.$database['hostName'].';dbname='.$database['databaseName'].';charset='.$database['characterSet'], $database['userName'], $database['password']) or die( 'Could Not Connect');
 
             // Change the exception handler back to whatever it was before
             restore_exception_handler();
